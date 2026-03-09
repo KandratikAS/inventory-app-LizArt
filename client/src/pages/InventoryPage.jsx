@@ -187,7 +187,8 @@ export default function InventoryPage() {
       api.get(`/comments/inventory/${id}`).then(r => setComments(r.data.comments));
 
       // Socket
-      const socket = io(import.meta.env.VITE_SOCKET_URL || '');
+      const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
+      const socket = io(SOCKET_URL);
       socketRef.current = socket;
       socket.emit('join-inventory', id);
       socket.on('comment:created', c => setComments(prev => [...prev, c]));
