@@ -1,0 +1,29 @@
+const router = require('express').Router();
+const ctrl = require('../controllers/inventoryController');
+const { authenticate, requireAuth } = require('../middleware/auth');
+
+router.use(authenticate);
+
+// ГЭТА НОВЫ РАДОК ДЛЯ СТАТЫСТЫКІ
+router.get('/stats', ctrl.getGlobalStats);
+
+router.get('/', ctrl.list);
+router.get('/my', requireAuth, ctrl.listMine);
+router.get('/accessible', requireAuth, ctrl.listAccessible);
+router.get('/categories', ctrl.categories);
+router.post('/categories', requireAuth, ctrl.createCategory);
+router.delete('/categories/:id', requireAuth, ctrl.deleteCategory);
+
+// ВАЖНА: Гэтыя маршруты з :id павінны ісці ПАСЛЯ /stats
+router.get('/:id', ctrl.get);
+router.post('/', requireAuth, ctrl.create);
+router.put('/:id', requireAuth, ctrl.update);
+router.delete('/:id', requireAuth, ctrl.remove);
+
+router.get('/:id/access', requireAuth, ctrl.getAccess);
+router.post('/:id/access', requireAuth, ctrl.addAccess);
+router.delete('/:id/access/:userId', requireAuth, ctrl.removeAccess);
+
+router.get('/:id/stats', ctrl.stats);
+
+module.exports = router;
