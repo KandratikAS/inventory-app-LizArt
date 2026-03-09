@@ -5,7 +5,6 @@ const cors = require('cors');
 const session = require('express-session');
 const passport = require('passport');
 const { Server } = require('socket.io');
-const rateLimit = require('express-rate-limit');
 
 require('./src/config/passport');
 
