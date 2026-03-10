@@ -41,7 +41,7 @@ export default function ItemPage() {
     try {
       if (isNew) {
         const r = await api.post(`/items/inventory/${inventoryId}`, form);
-        navigate(`/inventories/${inventoryId}/items/${r.data.item.id}`);
+        navigate(`/inventories/${inventoryId}`);
       } else {
         await api.put(`/items/${id}`, { ...form, version });
         navigate(`/inventories/${inventoryId}`);

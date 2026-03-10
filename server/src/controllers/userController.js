@@ -99,7 +99,21 @@ exports.unblock = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    await prisma.user.delete({ where: { id: req.params.id } });
+    const { id } = req.params;
+    console.log('Deleting user:', id, 'Admin:', req.user?.id);
+
+    await prisma.item.updateMany({
+      where: { createdById: id },
+      data: { createdById: null },
+    });
+
+    const invResult = await prisma.inventory.updateMany({
+      where: { ownerId: id },
+      data: { ownerId: req.user.id },
+    });
+    console.log('Inventories transferred:', invResult.count);
+
+    await prisma.user.delete({ where: { id } });
     res.json({ ok: true });
   } catch (e) {
     next(e);

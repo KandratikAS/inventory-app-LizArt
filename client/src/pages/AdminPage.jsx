@@ -146,6 +146,21 @@ export default function AdminPage() {
     }
   };
 
+const togglePublic = async (inv) => {
+  try {
+    await api.put(`/inventories/${inv.id}`, { 
+      isPublic: !inv.isPublic,
+      version: inv.version
+    });
+    setInventories(prev => prev.map(i => 
+      i.id === inv.id 
+        ? { ...i, isPublic: !i.isPublic, version: i.version + 1 } // 
+        : i
+    ));
+  } catch (e) {
+    alert(e.response?.data?.error || t('error'));
+  }
+};
   const filtered = users.filter(
     (u) =>
       u.username.toLowerCase().includes(filter.toLowerCase()) ||
@@ -180,7 +195,6 @@ export default function AdminPage() {
         </li>
       </ul>
 
-      {/* ── USERS TAB ── */}
       {activeTab === 'users' && (
         <>
           <div className="mb-3" style={{ maxWidth: 300 }}>
@@ -339,48 +353,56 @@ export default function AdminPage() {
           <div className="d-flex justify-content-between align-items-center mb-3 gap-2">
             <input className="form-control" style={{ maxWidth: 300 }} placeholder="Filter by title..."
               value={invFilter} onChange={e => setInvFilter(e.target.value)} />
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreateInv(v => !v)}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowCreateInv(true)}>
               <i className="bi bi-plus me-1" />Create Inventory
             </button>
           </div>
 
           {showCreateInv && (
-            <div className="card mb-4" style={{ maxWidth: 500 }}>
-              <div className="card-body">
-                <h6 className="fw-bold mb-3"><i className="bi bi-collection me-2" />New Inventory</h6>
-                <div className="mb-2">
-                  <label className="form-label small fw-semibold">Title *</label>
-                  <input className="form-control form-control-sm" value={newInv.title}
-                    onChange={e => setNewInv(p => ({ ...p, title: e.target.value }))}
-                    placeholder="Inventory title..." />
-                </div>
-                <div className="mb-2">
-                  <label className="form-label small fw-semibold">Description</label>
-                  <textarea className="form-control form-control-sm" rows={2} value={newInv.description}
-                    onChange={e => setNewInv(p => ({ ...p, description: e.target.value }))}
-                    placeholder="Optional description..." />
-                </div>
-                <div className="mb-2">
-                  <label className="form-label small fw-semibold">Owner *</label>
-                  <select className="form-select form-select-sm" value={newInv.ownerId}
-                    onChange={e => setNewInv(p => ({ ...p, ownerId: e.target.value }))}>
-                    <option value="">— select user —</option>
-                    {users.map(u => (
-                      <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="form-check mb-3">
-                  <input className="form-check-input" type="checkbox" id="invPublic"
-                    checked={newInv.isPublic} onChange={e => setNewInv(p => ({ ...p, isPublic: e.target.checked }))} />
-                  <label className="form-check-label small" htmlFor="invPublic">Public</label>
-                </div>
-                <div className="d-flex gap-2">
-                  <button className="btn btn-primary btn-sm" onClick={createInventory} disabled={invSaving}>
-                    {invSaving ? <span className="spinner-border spinner-border-sm me-1" /> : null}
-                    Save
-                  </button>
-                  <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowCreateInv(false)}>Cancel</button>
+            <div className="modal show d-block" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+              <div className="modal-dialog modal-dialog-centered">
+                <div className="modal-content">
+                  <div className="modal-header">
+                    <h5 className="modal-title"><i className="bi bi-collection me-2" />New Inventory</h5>
+                    <button className="btn-close" onClick={() => setShowCreateInv(false)} />
+                  </div>
+                  <div className="modal-body">
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold">Title *</label>
+                      <input className="form-control" value={newInv.title}
+                        onChange={e => setNewInv(p => ({ ...p, title: e.target.value }))}
+                        placeholder="Inventory title..." />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold">Description</label>
+                      <textarea className="form-control" rows={3} value={newInv.description}
+                        onChange={e => setNewInv(p => ({ ...p, description: e.target.value }))}
+                        placeholder="Optional description..." />
+                    </div>
+                    <div className="mb-3">
+                      <label className="form-label fw-semibold">Owner *</label>
+                      <select className="form-select" value={newInv.ownerId}
+                        onChange={e => setNewInv(p => ({ ...p, ownerId: e.target.value }))}>
+                        <option value="">— select user —</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.username} ({u.email})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-check form-switch">
+                      <input className="form-check-input" type="checkbox" id="invPublic"
+                        checked={newInv.isPublic}
+                        onChange={e => setNewInv(p => ({ ...p, isPublic: e.target.checked }))} />
+                      <label className="form-check-label" htmlFor="invPublic">Public</label>
+                    </div>
+                  </div>
+                  <div className="modal-footer">
+                    <button className="btn btn-outline-secondary" onClick={() => setShowCreateInv(false)}>Cancel</button>
+                    <button className="btn btn-primary" onClick={createInventory} disabled={invSaving}>
+                      {invSaving ? <span className="spinner-border spinner-border-sm me-1" /> : null}
+                      Save
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -410,17 +432,35 @@ export default function AdminPage() {
                           <Link to={`/inventories/${inv.id}`} className="fw-semibold text-decoration-none">
                             {inv.title}
                           </Link>
-                          {inv.description && <small className="text-muted d-block text-truncate" style={{ maxWidth: 250 }}>{inv.description}</small>}
+                          {inv.description && (
+                            <small className="text-muted d-block text-truncate" style={{ maxWidth: 250 }}>
+                              {inv.description}
+                            </small>
+                          )}
                         </td>
                         <td>
                           <div className="d-flex align-items-center gap-1">
-                            {inv.owner?.avatarUrl && <img src={inv.owner.avatarUrl} alt="" className="rounded-circle" width={22} height={22} style={{ objectFit: 'cover' }} />}
+                            {inv.owner?.avatarUrl && (
+                              <img src={inv.owner.avatarUrl} alt="" className="rounded-circle"
+                                width={22} height={22} style={{ objectFit: 'cover' }} />
+                            )}
                             <small>{inv.owner?.username}</small>
                           </div>
                         </td>
-                        <td className="text-center"><span className="badge bg-secondary">{inv._count?.items ?? 0}</span></td>
-                        <td className="text-center">{inv.isPublic ? <i className="bi bi-globe text-success" /> : <i className="bi bi-lock text-muted" />}</td>
-                        <td className="text-center"><small>{new Date(inv.createdAt).toLocaleDateString()}</small></td>
+                        <td className="text-center">
+                          <span className="badge bg-secondary">{inv._count?.items ?? 0}</span>
+                        </td>
+                        <td className="text-center">
+                          <div className="form-check form-switch d-flex justify-content-center mb-0">
+                            <input className="form-check-input" type="checkbox"
+                              checked={inv.isPublic}
+                              onChange={() => togglePublic(inv)}
+                              style={{ cursor: 'pointer' }} />
+                          </div>
+                        </td>
+                        <td className="text-center">
+                          <small>{new Date(inv.createdAt).toLocaleDateString()}</small>
+                        </td>
                         <td>
                           <div className="d-flex gap-1">
                             <Link className="btn btn-sm btn-outline-secondary" to={`/inventories/${inv.id}`}>

@@ -137,5 +137,9 @@
   "activeUsers": "Актыўныя карыстальнікі",
   "Admin": "Адміністратар",
   "Categories": "Катэгорыі",
-  "Inventories": "Інвентары"
+  "Inventories": "Інвентары",
+  "myItems": "Мае тавары",
+  "inventory": "інвентар"
+
+
 }

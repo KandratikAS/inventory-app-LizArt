@@ -1,10 +1,7 @@
 const jwt = require('jsonwebtoken');
 const prisma = require('../config/prisma');
 
-/**
- * Attach req.user if a valid Bearer token is present.
- * Does NOT block the request — use requireAuth for that.
- */
+
 exports.authenticate = async (req, res, next) => {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {

@@ -4,7 +4,6 @@ const { authenticate, requireAuth } = require('../middleware/auth');
 
 router.use(authenticate);
 
-// ГЭТА НОВЫ РАДОК ДЛЯ СТАТЫСТЫКІ
 router.get('/stats', ctrl.getGlobalStats);
 
 router.get('/', ctrl.list);
@@ -14,7 +13,6 @@ router.get('/categories', ctrl.categories);
 router.post('/categories', requireAuth, ctrl.createCategory);
 router.delete('/categories/:id', requireAuth, ctrl.deleteCategory);
 
-// ВАЖНА: Гэтыя маршруты з :id павінны ісці ПАСЛЯ /stats
 router.get('/:id', ctrl.get);
 router.post('/', requireAuth, ctrl.create);
 router.put('/:id', requireAuth, ctrl.update);

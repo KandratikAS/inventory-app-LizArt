@@ -3,7 +3,6 @@ const { generateCustomId } = require('../utils/customId');
 const { emitToInventory } = require('../utils/socket');
 
 
-// ─── Helper ───────────────────────────────────────────────────────────────────
 
 async function getWriteAccess(inventoryId, user) {
   if (!user) return false;
@@ -13,7 +12,7 @@ async function getWriteAccess(inventoryId, user) {
   });
   if (!inv) return false;
   if (user.isAdmin || inv.ownerId === user.id) return true;
-  if (inv.isPublic) return true; // ✅ дадаць гэты радок
+  if (inv.isPublic) return true; 
   return inv.access.some((a) => a.userId === user.id);
 }
 
@@ -22,7 +21,6 @@ const ITEM_INCLUDE = {
   _count: { select: { likes: true } },
 };
 
-// ─── Controllers ──────────────────────────────────────────────────────────────
 
 exports.list = async (req, res, next) => {
   try {
@@ -91,13 +89,11 @@ exports.create = async (req, res, next) => {
       select: { customId: true },
     });
 
-    // Try to extract a numeric sequence from last customId
     const count = await prisma.item.count({ where: { inventoryId } });
     const seqVal = count + 1;
 
     const customId = providedId || generateCustomId(inv.customIdFormat, seqVal);
 
-    // Uniqueness check (DB constraint will also enforce it)
     const conflict = await prisma.item.findUnique({
       where: { inventoryId_customId: { inventoryId, customId } },
     });
@@ -144,7 +140,6 @@ exports.update = async (req, res, next) => {
 
     const { fieldValues, customId, version } = req.body;
 
-    // Optimistic locking
     if (version !== undefined && existing.version !== Number(version)) {
       return res.status(409).json({
         error: 'Version conflict',
@@ -152,7 +147,6 @@ exports.update = async (req, res, next) => {
       });
     }
 
-    // Custom ID uniqueness check
     if (customId && customId !== existing.customId) {
       const conflict = await prisma.item.findFirst({
         where: {
@@ -261,7 +255,6 @@ exports.bulkRemove = async (req, res, next) => {
     if (!Array.isArray(ids) || !ids.length)
       return res.status(400).json({ error: 'ids required' });
 
-    // Праверка што ўсе тавары належаць аднаму інвентару і карыстальнік мае доступ
     const items = await prisma.item.findMany({
       where: { id: { in: ids } },
       select: { inventoryId: true },
@@ -275,7 +268,6 @@ exports.bulkRemove = async (req, res, next) => {
 
     await prisma.item.deleteMany({ where: { id: { in: ids } } });
 
-    // Паведамляем усім у пакоі
     for (const id of ids) {
       emitToInventory(inventoryIds[0], 'item:deleted', { id });
     }

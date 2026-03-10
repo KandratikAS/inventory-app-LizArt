@@ -16,7 +16,6 @@ passport.deserializeUser(async (id, done) => {
   }
 });
 
-// ─── Local Strategy ────────────────────────────────────────────────────────────
 passport.use(
   new LocalStrategy({ usernameField: 'email' }, async (email, password, done) => {
     try {
@@ -35,7 +34,6 @@ passport.use(
   })
 );
 
-// ─── OAuth helper ──────────────────────────────────────────────────────────────
 async function handleOAuth(provider, profile, done) {
   try {
     const email =
@@ -51,7 +49,6 @@ async function handleOAuth(provider, profile, done) {
       if (existing.user.isBlocked)
         return done(null, false, { message: 'Account blocked' });
 
-      // ✅ Абнаўляем аватар, калі ён змяніўся
       const newAvatar = profile.photos?.[0]?.value || null;
       if (newAvatar && existing.user.avatarUrl !== newAvatar) {
         const updated = await prisma.user.update({
@@ -61,7 +58,6 @@ async function handleOAuth(provider, profile, done) {
         return done(null, updated);
       }
 
-      // ✅ Калі username быў пустым (напрыклад, пасля старой памылкі), запаўняем яго поштай
       if (!existing.user.username || existing.user.username.includes('___')) {
         const updated = await prisma.user.update({
           where: { id: existing.user.id },
@@ -73,24 +69,20 @@ async function handleOAuth(provider, profile, done) {
       return done(null, existing.user);
     }
 
-    // ✅ Спрабуем звязаць з існуючым карыстальнікам па email
     let user = await prisma.user.findUnique({ where: { email } });
 
     if (user) {
-      // ✅ Абнаўляем аватар і заадно запаўняем username, калі ён пусты
       const newAvatar = profile.photos?.[0]?.value || null;
       user = await prisma.user.update({
         where: { id: user.id },
         data: { 
           avatarUrl: newAvatar || user.avatarUrl,
-          username: user.username || email // Калі username пусты — пішам пошту
+          username: user.username || email 
         },
       });
     } else {
-      // ✅ Для НОВАГА карыстальніка адразу ставім email як username
       let username = email;
 
-      // На ўсялякі выпадак праверым, ці не заняты такі username (хоць email унікальны)
       const conflict = await prisma.user.findUnique({ where: { username } });
       if (conflict) {
         username = `${email}_${Math.floor(Math.random() * 1000)}`;
@@ -105,7 +97,6 @@ async function handleOAuth(provider, profile, done) {
       });
     }
 
-    // Ствараем сувязь з OAuth акаўнтам
     await prisma.oAuthAccount.upsert({
       where: { provider_providerId: { provider, providerId: String(profile.id) } },
       update: {},
@@ -118,7 +109,6 @@ async function handleOAuth(provider, profile, done) {
   }
 }
 
-// ─── Google Strategy ───────────────────────────────────────────────────────────
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(
     new GoogleStrategy(
@@ -133,7 +123,6 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   );
 }
 
-// ─── GitHub Strategy ───────────────────────────────────────────────────────────
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   passport.use(
     new GitHubStrategy(

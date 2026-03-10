@@ -49,7 +49,6 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// ── Routes ─────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/inventories', inventoryRoutes);
 app.use('/api/items', itemRoutes);

@@ -16,6 +16,7 @@ export default function InventoryListPage() {
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sort, setSort] = useState({ column: 'createdAt', asc: false });
 
   const LIMIT = 20;
 
@@ -32,12 +33,43 @@ export default function InventoryListPage() {
       .finally(() => setLoading(false));
   }, [page, tag]);
 
+  const toggleSort = (col) => {
+    setSort(prev => ({ column: col, asc: prev.column === col ? !prev.asc : true }));
+  };
+
+  const sortIcon = (col) => (
+    <i className={`bi bi-chevron-${sort.column === col ? (sort.asc ? 'up' : 'down') : 'expand'} ms-1 opacity-50`} />
+  );
+
   const displayed = filter
     ? inventories.filter((i) =>
         i.title.toLowerCase().includes(filter.toLowerCase()) ||
         i.owner?.username.toLowerCase().includes(filter.toLowerCase())
       )
     : inventories;
+
+  const sortedInventories = [...displayed].sort((a, b) => {
+    let valA, valB;
+    if (sort.column === 'title') {
+      valA = a.title?.toLowerCase() || '';
+      valB = b.title?.toLowerCase() || '';
+    } else if (sort.column === 'category') {
+      valA = a.category?.name?.toLowerCase() || '';
+      valB = b.category?.name?.toLowerCase() || '';
+    } else if (sort.column === 'owner') {
+      valA = a.owner?.username?.toLowerCase() || '';
+      valB = b.owner?.username?.toLowerCase() || '';
+    } else if (sort.column === 'items') {
+      valA = a._count?.items ?? 0;
+      valB = b._count?.items ?? 0;
+    } else if (sort.column === 'createdAt') {
+      valA = new Date(a.createdAt);
+      valB = new Date(b.createdAt);
+    }
+    if (valA < valB) return sort.asc ? -1 : 1;
+    if (valA > valB) return sort.asc ? 1 : -1;
+    return 0;
+  });
 
   const totalPages = Math.ceil(total / LIMIT);
 
@@ -46,13 +78,9 @@ export default function InventoryListPage() {
       <div className="d-flex flex-wrap align-items-center justify-content-between mb-3 gap-2">
         <h4 className="mb-0">
           {tag ? (
-            <>
-              <i className="bi bi-tag me-2" />#{tag}
-            </>
+            <><i className="bi bi-tag me-2" />#{tag}</>
           ) : (
-            <>
-              <i className="bi bi-collection me-2" />{t('inventories')}
-            </>
+            <><i className="bi bi-collection me-2" />{t('inventories')}</>
           )}
           <span className="text-muted fs-6 ms-2">({total})</span>
         </h4>
@@ -65,6 +93,11 @@ export default function InventoryListPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
+          {user && (
+            <Link className="btn btn-primary btn-sm" to="/inventories/new">
+              <i className="bi bi-plus me-1" />{t('createInventory')}
+            </Link>
+          )}
         </div>
       </div>
 
@@ -77,16 +110,26 @@ export default function InventoryListPage() {
           <table className="table table-hover align-middle mb-0">
             <thead className="table-light">
               <tr>
-                <th>{t('title')}</th>
-                <th>{t('category')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('title')}>
+                  {t('title')}{sortIcon('title')}
+                </th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('category')}>
+                  {t('category')}{sortIcon('category')}
+                </th>
                 <th>{t('tags')}</th>
-                <th>{t('owner')}</th>
-                <th className="text-center">{t('items')}</th>
-                <th>{t('createdAt')}</th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('owner')}>
+                  {t('owner')}{sortIcon('owner')}
+                </th>
+                <th className="text-center" style={{ cursor: 'pointer' }} onClick={() => toggleSort('items')}>
+                  {t('items')}{sortIcon('items')}
+                </th>
+                <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('createdAt')}>
+                  {t('createdAt')}{sortIcon('createdAt')}
+                </th>
               </tr>
             </thead>
             <tbody>
-              {displayed.map((inv) => (
+              {sortedInventories.map((inv) => (
                 <tr
                   key={inv.id}
                   style={{ cursor: 'pointer' }}
@@ -95,38 +138,24 @@ export default function InventoryListPage() {
                   <td>
                     <div className="d-flex align-items-center gap-2">
                       {inv.imageUrl && (
-                        <img
-                          src={inv.imageUrl}
-                          alt=""
-                          className="rounded"
-                          style={{ width: 32, height: 32, objectFit: 'cover' }}
-                        />
+                        <img src={inv.imageUrl} alt="" className="rounded"
+                          style={{ width: 32, height: 32, objectFit: 'cover' }} />
                       )}
                       <div>
                         <span className="fw-semibold">{inv.title}</span>
                         {inv.isPublic && (
-                          <span className="badge bg-success-subtle text-success ms-2 small">
-                            Public
-                          </span>
+                          <span className="badge bg-success-subtle text-success ms-2 small">Public</span>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td>
-                    <small className="text-muted">{inv.category?.name || '—'}</small>
-                  </td>
+                  <td><small className="text-muted">{inv.category?.name || '—'}</small></td>
                   <td>
                     <div className="d-flex flex-wrap gap-1">
                       {inv.tags?.slice(0, 4).map((it) => (
-                        <span
-                          key={it.tagId}
-                          className="badge"
+                        <span key={it.tagId} className="badge"
                           style={{ background: 'var(--bs-secondary-bg)', color: 'var(--bs-body-color)', border: '1px solid var(--bs-border-color)', cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/inventories?tag=${encodeURIComponent(it.tag.name)}`);
-                          }}
-                        >
+                          onClick={(e) => { e.stopPropagation(); navigate(`/inventories?tag=${encodeURIComponent(it.tag.name)}`); }}>
                           #{it.tag.name}
                         </span>
                       ))}
@@ -135,24 +164,18 @@ export default function InventoryListPage() {
                       )}
                     </div>
                   </td>
-                  <td>
-                    <small className="text-muted">{inv.owner?.username}</small>
-                  </td>
+                  <td><small className="text-muted">{inv.owner?.username}</small></td>
                   <td className="text-center">
                     <span className="badge bg-secondary">{inv._count?.items ?? 0}</span>
                   </td>
                   <td>
-                    <small className="text-muted">
-                      {new Date(inv.createdAt).toLocaleDateString()}
-                    </small>
+                    <small className="text-muted">{new Date(inv.createdAt).toLocaleDateString()}</small>
                   </td>
                 </tr>
               ))}
-              {!displayed.length && (
+              {!sortedInventories.length && (
                 <tr>
-                  <td colSpan={6} className="text-center text-muted py-4">
-                    {t('noInventories')}
-                  </td>
+                  <td colSpan={6} className="text-center text-muted py-4">{t('noInventories')}</td>
                 </tr>
               )}
             </tbody>
@@ -160,7 +183,6 @@ export default function InventoryListPage() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <nav className="mt-3">
           <ul className="pagination pagination-sm justify-content-center">
@@ -173,9 +195,7 @@ export default function InventoryListPage() {
               .filter((p) => Math.abs(p - page) <= 2)
               .map((p) => (
                 <li key={p} className={`page-item ${p === page ? 'active' : ''}`}>
-                  <button className="page-link" onClick={() => setPage(p)}>
-                    {p}
-                  </button>
+                  <button className="page-link" onClick={() => setPage(p)}>{p}</button>
                 </li>
               ))}
             <li className={`page-item ${page === totalPages ? 'disabled' : ''}`}>

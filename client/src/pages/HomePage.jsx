@@ -93,7 +93,6 @@ export default function HomePage() {
   return (
     <div className="container py-4" style={{ minHeight: '100vh' }}>
 
-      {/* --- 1. Статыстыка --- */}
       <div className="row g-3 mb-5">
         {[
           { label: t('totalInventories'), value: stats.totalInventories, icon: 'bi-collection', color: '#0d6efd' },
@@ -113,13 +112,11 @@ export default function HomePage() {
       </div>
 
       <div className="row g-4">
-        {/* --- 2. Галоўная табліца --- */}
         <div className="col-12 col-xl-8">
           <div className="card border-0 shadow-sm rounded-4 overflow-hidden">
-            <div className="card-header py-3 d-flex justify-content-between align-items-center">
-              <h5 className="mb-0 fw-bold">{t('recentInventories')}</h5>
-              <Link to="/inventories" className="btn btn-sm btn-outline-secondary">{t('inventories')}</Link>
-            </div>
+        <div className="card-header py-3">         
+        <h5 className="mb-0 fw-bold">{t('recentInventories')}</h5>
+        </div>
             <div className="table-responsive">
               <table className="table table-hover align-middle mb-0">
                 <thead className="table-light">
@@ -180,10 +177,8 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* --- 3. Бакавая панэль --- */}
         <div className="col-12 col-xl-4 d-flex flex-column gap-4">
 
-          {/* Popular */}
           <div className="card border-0 shadow-sm rounded-4 p-3">
             <h6 className="fw-bold mb-3">{t('popularInventories')}</h6>
             {popular.map((inv, idx) => {
@@ -203,7 +198,6 @@ export default function HomePage() {
             })}
           </div>
 
-          {/* Tags */}
           <div className="card border-0 shadow-sm rounded-4 p-3">
             <h6 className="fw-bold mb-3 text-center">{t('tagCloud')}</h6>
             <div className="d-flex flex-wrap justify-content-center gap-2">

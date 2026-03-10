@@ -1,12 +1,11 @@
 const prisma = require('../config/prisma');
 
-// ─── Permission helpers ────────────────────────────────────────────────────────
 
 function canWrite(inventory, user) {
   if (!user) return false;
   if (user.isAdmin) return true;
   if (inventory.ownerId === user.id) return true;
-  if (inventory.isPublic) return true; // ✅ любы аўтарызаваны можа дадаваць тавары
+  if (inventory.isPublic) return true; 
   return (inventory.access || []).some((a) => a.userId === user.id);
 }
 
@@ -16,7 +15,6 @@ function canManage(inventory, user) {
   return inventory.ownerId === user.id;
 }
 
-// ─── Prisma include preset ────────────────────────────────────────────────────
 
 const INCLUDE = {
   owner: { select: { id: true, username: true, avatarUrl: true } },
@@ -31,18 +29,29 @@ const INCLUDE = {
   _count: { select: { items: true, comments: true } },
 };
 
-// ─── Controllers ──────────────────────────────────────────────────────────────
 
 exports.list = async (req, res, next) => {
   try {
     const { page = 1, limit = 20, category, tag, sort } = req.query;
     const where = {};
+
+    if (!req.user) {
+      where.isPublic = true;
+    }
+    else if (!req.user.isAdmin) {
+      where.OR = [
+        { isPublic: true },
+        { ownerId: req.user.id },
+        { access: { some: { userId: req.user.id } } },
+      ];
+    }
+
     if (category) where.categoryId = category;
     if (tag) where.tags = { some: { tag: { name: tag } } };
 
     const orderBy = sort === 'popular'
-    ? { items: { _count: 'desc' } }
-    : { lastViewedAt: { sort: 'desc', nulls: 'last' } };
+      ? { items: { _count: 'desc' } }
+      : { lastViewedAt: { sort: 'desc', nulls: 'last' } };
 
     const [inventories, total] = await Promise.all([
       prisma.inventory.findMany({
@@ -110,7 +119,16 @@ exports.get = async (req, res, next) => {
     });
     if (!inventory) return res.status(404).json({ error: 'Not found' });
 
-      await prisma.inventory.update({
+    if (!inventory.isPublic && !req.user) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+    if (!inventory.isPublic && req.user && !req.user.isAdmin &&
+        inventory.ownerId !== req.user.id &&
+        !(inventory.access || []).some(a => a.userId === req.user.id)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    await prisma.inventory.update({
       where: { id: req.params.id },
       data: { lastViewedAt: new Date() },
     });
@@ -132,7 +150,6 @@ exports.create = async (req, res, next) => {
 
     if (!title) return res.status(400).json({ error: 'Title required' });
 
-    // Build tags connect/create
     const tagConnects = [];
     for (const name of tags || []) {
       const tag = await prisma.tag.upsert({
@@ -187,7 +204,6 @@ exports.update = async (req, res, next) => {
       version,
     } = req.body;
 
-    // Optimistic locking
     if (version !== undefined && existing.version !== Number(version)) {
       return res.status(409).json({
         error: 'Version conflict',
@@ -195,7 +211,6 @@ exports.update = async (req, res, next) => {
       });
     }
 
-    // Replace tags
     if (tags !== undefined) {
       await prisma.inventoryTag.deleteMany({ where: { inventoryId: existing.id } });
       for (const name of tags) {
@@ -206,12 +221,10 @@ exports.update = async (req, res, next) => {
       }
     }
 
-// Replace fields
 if (fields !== undefined) {
   const existingFieldIds = existing.fields.map(f => f.id);
   const incomingIds = fields.filter(f => f.id).map(f => f.id);
   
-  // Выдаліць толькі тыя палі якіх няма ў новым спісе
   const toDelete = existingFieldIds.filter(id => !incomingIds.includes(id));
   if (toDelete.length) {
     await prisma.inventoryField.deleteMany({ where: { id: { in: toDelete } } });
@@ -268,7 +281,6 @@ exports.remove = async (req, res, next) => {
   }
 };
 
-// ─── Access management ────────────────────────────────────────────────────────
 
 exports.getAccess = async (req, res, next) => {
   try {
@@ -333,7 +345,6 @@ exports.removeAccess = async (req, res, next) => {
   }
 };
 
-// ─── Statistics ───────────────────────────────────────────────────────────────
 
 exports.stats = async (req, res, next) => {
   try {

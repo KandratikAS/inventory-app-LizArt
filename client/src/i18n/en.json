@@ -134,5 +134,10 @@
   "falseCount": "No",
   "totalInventories": "Total inventories",
   "totalItems": "Total items",
-  "activeUsers": "Active Users"
+  "activeUsers": "Active Users",
+  "Admin": "Admin",
+  "Categories": "Categories",
+  "Inventories": "Inventories",
+  "myItems": "My Items",
+  "inventory": "inventory"
 }

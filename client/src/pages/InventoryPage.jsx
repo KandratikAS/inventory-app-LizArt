@@ -120,6 +120,9 @@ export default function InventoryPage() {
   const [manageAccess, setManageAccess] = useState(false);
   const [activeTab, setActiveTab] = useState('items');
   const [loading, setLoading] = useState(!isNew);
+  const [itemSort, setItemSort] = useState({ column: 'createdAt', asc: false });
+  const [idPartType, setIdPartType] = useState('');
+  const [fieldType, setFieldType] = useState('');
 
   // Editable state
   const [form, setForm] = useState({
@@ -155,11 +158,8 @@ export default function InventoryPage() {
   const socketRef = useRef(null);
 
   useEffect(() => {
-    api.get('/users/tags').then(r => setCategories([])); // categories from DB
-    // Load categories
-    api.get('/inventories?limit=1').then(() => {
-      // We'd normally have a /categories endpoint
-    });
+    api.get('/users/tags').then(r => setCategories([]));
+    api.get('/inventories?limit=1').then(() => {});
 
     if (!isNew) {
       api.get(`/inventories/${id}`).then(r => {
@@ -186,7 +186,6 @@ export default function InventoryPage() {
       api.get(`/items/inventory/${id}`).then(r => setItems(r.data.items));
       api.get(`/comments/inventory/${id}`).then(r => setComments(r.data.comments));
 
-      // Socket
       const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || window.location.origin;
       const socket = io(SOCKET_URL);
       socketRef.current = socket;
@@ -204,7 +203,6 @@ export default function InventoryPage() {
     }
   }, [id, isNew]);
 
-  // Auto-save (only for manage users, not for write-only users)
   const autoSave = useCallback(async () => {
     if (!manageAccess || isNew) return;
     setSaveStatus('autoSaving');
@@ -223,12 +221,27 @@ export default function InventoryPage() {
   }, [form, id, manageAccess, isNew]);
 
   useEffect(() => {
-    if (!manageAccess || isNew) return;
+    if (!manageAccess || isNew || activeTab === 'settings') return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus('');
-    saveTimer.current = setTimeout(autoSave, 8000);
+    saveTimer.current = setTimeout(autoSave, 10000);
     return () => clearTimeout(saveTimer.current);
-  }, [form, autoSave]);
+  }, [form, autoSave, activeTab]);
+
+  // Ручное захаванне для Settings
+  const saveSettings = async () => {
+    setSaveStatus('autoSaving');
+    try {
+      const r = await api.put(`/inventories/${id}`, { ...form, version: lastSavedVersion.current });
+      lastSavedVersion.current = r.data.inventory.version;
+      setVersion(r.data.inventory.version);
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus(''), 2000);
+    } catch (e) {
+      if (e.response?.data?.error === 'Version conflict') setSaveStatus('conflict');
+      else setSaveStatus('error');
+    }
+  };
 
   const handleCreate = async () => {
     try {
@@ -271,7 +284,8 @@ export default function InventoryPage() {
 
   // Custom ID
   const addIdPart = (type) => {
-    setForm(f => ({ ...f, customIdFormat: [...f.customIdFormat, { type, _id: Date.now() + '_' + type }] }));
+    if (form.customIdFormat.length > 0) return;
+    setForm(f => ({ ...f, customIdFormat: [{ type, _id: Date.now() + '_' + type }] }));
   };
 
   const updateIdPart = (idx, part) => setForm(f => {
@@ -322,12 +336,12 @@ export default function InventoryPage() {
   };
 
   // Items
-const deleteItems = async () => {
-  if (!confirm(t('confirm'))) return;
-  await api.delete('/items/bulk', { data: { ids: [...selectedItems] } });
-  setItems(prev => prev.filter(i => !selectedItems.has(i.id)));
-  setSelectedItems(new Set());
-};
+  const deleteItems = async () => {
+    if (!confirm(t('confirm'))) return;
+    await api.delete('/items/bulk', { data: { ids: [...selectedItems] } });
+    setItems(prev => prev.filter(i => !selectedItems.has(i.id)));
+    setSelectedItems(new Set());
+  };
 
   const toggleSelect = (itemId) => {
     setSelectedItems(prev => {
@@ -348,6 +362,40 @@ const deleteItems = async () => {
     await api.post(`/comments/inventory/${id}`, { content: commentText });
     setCommentText('');
   };
+
+  const sortedItems = [...items].sort((a, b) => {
+    let valA, valB;
+    if (itemSort.column === 'name') {
+      valA = a.name?.toLowerCase() || '';
+      valB = b.name?.toLowerCase() || '';
+    } else if (itemSort.column === 'customId') {
+      valA = a.customId?.toLowerCase() || '';
+      valB = b.customId?.toLowerCase() || '';
+    } else if (itemSort.column === 'createdBy') {
+      valA = a.createdBy?.username?.toLowerCase() || '';
+      valB = b.createdBy?.username?.toLowerCase() || '';
+    } else if (itemSort.column === 'createdAt') {
+      valA = new Date(a.createdAt);
+      valB = new Date(b.createdAt);
+    } else if (itemSort.column === 'likes') {
+      valA = a._count?.likes ?? 0;
+      valB = b._count?.likes ?? 0;
+    } else {
+      valA = String(a.fieldValues?.[itemSort.column] ?? '').toLowerCase();
+      valB = String(b.fieldValues?.[itemSort.column] ?? '').toLowerCase();
+    }
+    if (valA < valB) return itemSort.asc ? -1 : 1;
+    if (valA > valB) return itemSort.asc ? 1 : -1;
+    return 0;
+  });
+
+  const toggleItemSort = (col) => {
+    setItemSort(prev => ({ column: col, asc: prev.column === col ? !prev.asc : true }));
+  };
+
+  const sortIcon = (col) => (
+    <i className={`bi bi-chevron-${itemSort.column === col ? (itemSort.asc ? 'up' : 'down') : 'expand'} ms-1 opacity-50`} />
+  );
 
   const likeItem = async (itemId, liked) => {
     if (liked) await api.delete(`/items/${itemId}/like`);
@@ -387,9 +435,15 @@ const deleteItems = async () => {
             )}
         </div>
         <div className="d-flex gap-2 align-items-center">
-          {saveStatus === 'autoSaving' && <span className="text-muted small"><span className="spinner-border spinner-border-sm me-1" />{t('autoSaving')}</span>}
-          {saveStatus === 'saved' && <span className="text-success small"><i className="bi bi-check2 me-1" />{t('saved')}</span>}
-          {saveStatus === 'conflict' && <span className="text-danger small">{t('versionConflict')}</span>}
+          {saveStatus === 'autoSaving' && activeTab !== 'settings' && (
+            <span className="text-muted small"><span className="spinner-border spinner-border-sm me-1" />{t('autoSaving')}</span>
+          )}
+          {saveStatus === 'saved' && activeTab !== 'settings' && (
+            <span className="text-success small"><i className="bi bi-check2 me-1" />{t('saved')}</span>
+          )}
+          {saveStatus === 'conflict' && activeTab !== 'settings' && (
+            <span className="text-danger small">{t('versionConflict')}</span>
+          )}
           {isNew && <button className="btn btn-primary btn-sm" onClick={handleCreate}>{t('save')}</button>}
           {!isNew && manageAccess && (
             <button className="btn btn-outline-danger btn-sm" onClick={handleDelete}>
@@ -415,9 +469,11 @@ const deleteItems = async () => {
       {/* --- ITEMS TAB --- */}
       {activeTab === 'items' && (
         <div>
-          {writeAccess &&(
+          {writeAccess && (
             <div className="mb-2 d-flex gap-2">
-              <Link className="btn btn-primary btn-sm" to={`/inventories/${id}/items/new`}><i className="bi bi-plus me-1" />{t('addItem')}</Link>
+              <Link className="btn btn-primary btn-sm" to={`/inventories/${id}/items/new`}>
+                <i className="bi bi-plus me-1" />{t('addItem')}
+              </Link>
               {selectedItems.size > 0 && (
                 <button className="btn btn-outline-danger btn-sm" onClick={deleteItems}>
                   <i className="bi bi-trash me-1" />{t('deleteItem')} ({selectedItems.size})
@@ -429,26 +485,50 @@ const deleteItems = async () => {
             <table className="table table-hover align-middle">
               <thead className="table-light">
                 <tr>
-                  {writeAccess && <th><input type="checkbox" checked={selectedItems.size === items.length && items.length > 0}
-                    onChange={toggleSelectAll} /></th>}
-                  <th>{t('title')}</th>
-                  {tableFields.map(f => <th key={f.id || f._tempId}>{f.label}</th>)}
-                  <th>{t('customId')}</th>
-                  <th>{t('createdBy')}</th>
-                  <th>{t('createdAt')}</th>
-                  <th>{t('likes')}</th>
+                  {writeAccess && (
+                    <th>
+                      <input type="checkbox"
+                        checked={selectedItems.size === items.length && items.length > 0}
+                        onChange={toggleSelectAll} />
+                    </th>
+                  )}
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('name')}>
+                    {t('title')}{sortIcon('name')}
+                  </th>
+                  {tableFields.map(f => (
+                    <th key={f.id || f._tempId} style={{ cursor: 'pointer' }}
+                      onClick={() => toggleItemSort(f.id)}>
+                      {f.label}{sortIcon(f.id)}
+                    </th>
+                  ))}
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('customId')}>
+                    {t('customId')}{sortIcon('customId')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('createdBy')}>
+                    {t('createdBy')}{sortIcon('createdBy')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('createdAt')}>
+                    {t('createdAt')}{sortIcon('createdAt')}
+                  </th>
+                  <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('likes')}>
+                    {t('likes')}{sortIcon('likes')}
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {items.map(item => {
+                {sortedItems.map(item => {
                   const liked = item.likes?.length > 0;
                   return (
                     <tr key={item.id}
                       onDoubleClick={() => navigate(`/inventories/${id}/items/${item.id}`)}
                       style={{ cursor: 'pointer' }}>
-                      {writeAccess && <td onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={selectedItems.has(item.id)} onChange={() => toggleSelect(item.id)} />
-                      </td>}
+                      {writeAccess && (
+                        <td onClick={e => e.stopPropagation()}>
+                          <input type="checkbox"
+                            checked={selectedItems.has(item.id)}
+                            onChange={() => toggleSelect(item.id)} />
+                        </td>
+                      )}
                       <td>
                         <Link to={`/inventories/${id}/items/${item.id}`} onClick={e => e.stopPropagation()}>
                           {item.name || '—'}
@@ -468,7 +548,7 @@ const deleteItems = async () => {
                           {item.customId}
                         </Link>
                       </td>
-                      <td><small>{item.createdBy?.username}</small></td>
+                      <td><small>{item.createdBy?.username || <span className="text-muted">deleted</span>}</small></td>
                       <td><small>{new Date(item.createdAt).toLocaleDateString()}</small></td>
                       <td>
                         <button className={`btn btn-sm ${liked ? 'btn-danger' : 'btn-outline-secondary'}`}
@@ -481,12 +561,15 @@ const deleteItems = async () => {
                   );
                 })}
                 {!items.length && (
-                  <tr><td colSpan={tableFields.length + 6} className="text-center text-muted py-3">{t('noItems')}</td></tr>
+                  <tr>
+                    <td colSpan={tableFields.length + 6} className="text-center text-muted py-3">
+                      {t('noItems')}
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
           </div>
-          <small className="text-muted">{t('dragToReorder')}: Double-click row to open item</small>
         </div>
       )}
 
@@ -518,161 +601,209 @@ const deleteItems = async () => {
 
       {/* --- SETTINGS TAB --- */}
       {activeTab === 'settings' && manageAccess && (
-        <div className="row g-3" style={{ maxWidth: 600 }}>
-          <div className="col-12">
-            <label className="form-label">{t('title')}</label>
-            <input className="form-control" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
-          </div>
-          <div className="col-12">
-            <label className="form-label">{t('description')} (Markdown)</label>
-            <textarea className="form-control" rows={4} value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
-            {form.description && (
-              <div className="border rounded p-2 mt-1 bg-body-secondary">
-                <small className="text-muted d-block mb-1">{t('preview')}</small>
-                <ReactMarkdown>{form.description}</ReactMarkdown>
+        <div className="d-flex justify-content-center">
+          <div className="row g-3 w-100" style={{ maxWidth: 600 }}>
+            <div className="col-12">
+              <label className="form-label">{t('title')}</label>
+              <input className="form-control" value={form.title}
+                onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+            </div>
+            <div className="col-12">
+              <label className="form-label">{t('description')} (Markdown)</label>
+              <textarea className="form-control" rows={4} value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
+              {form.description && (
+                <div className="border rounded p-2 mt-1 bg-body-secondary">
+                  <small className="text-muted d-block mb-1">{t('preview')}</small>
+                  <ReactMarkdown>{form.description}</ReactMarkdown>
+                </div>
+              )}
+            </div>
+            <div className="col-12">
+              <label className="form-label">{t('image')} URL</label>
+              <input
+                className={`form-control ${form.imageUrl && !/^https?:\/\/.+/.test(form.imageUrl) ? 'is-invalid' : ''}`}
+                value={form.imageUrl}
+                onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))}
+                placeholder="https://..." />
+              {form.imageUrl && !/^https?:\/\/.+/.test(form.imageUrl) && (
+                <div className="invalid-feedback">Must be a valid URL (https://...)</div>
+              )}
+            </div>
+            <div className="col-12">
+              <div className="form-check">
+                <input className="form-check-input" type="checkbox" id="isPublic" checked={form.isPublic}
+                  onChange={e => setForm(f => ({ ...f, isPublic: e.target.checked }))} />
+                <label className="form-check-label" htmlFor="isPublic">{t('isPublic')}</label>
+              </div>
+            </div>
+            <div className="col-12">
+              <label className="form-label">{t('tags')}</label>
+              <div className="d-flex flex-wrap gap-1 mb-2">
+                {form.tags.map(tag => (
+                  <span key={tag} className="badge bg-secondary d-flex align-items-center gap-1">
+                    #{tag}
+                    <button className="btn-close btn-close-white btn-sm" style={{ fontSize: 8 }}
+                      onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))} />
+                  </span>
+                ))}
+              </div>
+              <div className="position-relative" style={{ maxWidth: 300 }}>
+                <input className="form-control form-control-sm" placeholder="Add tag..."
+                  value={tagInput}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (/^[a-zA-Z0-9_\-]*$/.test(val)) setTagInput(val);
+                  }}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { e.preventDefault(); if (tagInput.trim()) addTag(tagInput); }
+                  }} />
+                {tagSuggestions.length > 0 && (
+                  <ul className="dropdown-menu show position-absolute w-100" style={{ top: '100%', zIndex: 1000 }}>
+                    {tagSuggestions.map(s => (
+                      <li key={s}><button className="dropdown-item" onClick={() => addTag(s)}>#{s}</button></li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="col-12 d-flex align-items-center gap-2">
+            <button className="btn btn-primary"
+            onClick={saveSettings}
+            disabled={saveStatus === 'autoSaving' || !form.title.trim() || (form.imageUrl && !/^https?:\/\/.+/.test(form.imageUrl))}>
+            {t('save')}
+            </button>
+              {saveStatus === 'saved' && <span className="text-success small"><i className="bi bi-check2 me-1" />{t('saved')}</span>}
+              {saveStatus === 'conflict' && <span className="text-danger small">{t('versionConflict')}</span>}
+            </div>
+            {isNew && (
+              <div className="col-12">
+                <button className="btn btn-primary" onClick={handleCreate}>{t('save')}</button>
               </div>
             )}
           </div>
-          <div className="col-12">
-            <label className="form-label">{t('image')} URL</label>
-            <input className="form-control" value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} />
-          </div>
-          <div className="col-12">
-            <div className="form-check">
-              <input className="form-check-input" type="checkbox" id="isPublic" checked={form.isPublic}
-                onChange={e => setForm(f => ({ ...f, isPublic: e.target.checked }))} />
-              <label className="form-check-label" htmlFor="isPublic">{t('isPublic')}</label>
-            </div>
-          </div>
-          {/* Tags */}
-          <div className="col-12">
-            <label className="form-label">{t('tags')}</label>
-            <div className="d-flex flex-wrap gap-1 mb-2">
-              {form.tags.map(tag => (
-                <span key={tag} className="badge bg-secondary d-flex align-items-center gap-1">
-                  #{tag}
-                  <button className="btn-close btn-close-white btn-sm" style={{ fontSize: 8 }}
-                    onClick={() => setForm(f => ({ ...f, tags: f.tags.filter(t => t !== tag) }))} />
-                </span>
-              ))}
-            </div>
-            <div className="position-relative" style={{ maxWidth: 300 }}>
-              <input className="form-control form-control-sm" placeholder="Add tag..."
-                value={tagInput} onChange={e => setTagInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput); } }} />
-              {tagSuggestions.length > 0 && (
-                <ul className="dropdown-menu show position-absolute w-100" style={{ top: '100%', zIndex: 1000 }}>
-                  {tagSuggestions.map(s => (
-                    <li key={s}><button className="dropdown-item" onClick={() => addTag(s)}>#{s}</button></li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </div>
-          {isNew && (
-            <div className="col-12">
-              <button className="btn btn-primary" onClick={handleCreate}>{t('save')}</button>
-            </div>
-          )}
         </div>
       )}
 
       {/* --- CUSTOM ID TAB --- */}
       {activeTab === 'customId' && manageAccess && (
-        <div style={{ maxWidth: 700 }}>
-          <div className="alert alert-info d-flex gap-2">
-            <i className="bi bi-info-circle-fill" />
-            <div>
-              <strong>{t('preview')}:</strong> <code>{previewCustomId(form.customIdFormat)}</code>
+        <div className="d-flex justify-content-center">
+          <div style={{ maxWidth: 700, width: '100%' }}>
+            <div className="alert alert-info d-flex gap-2">
+              <i className="bi bi-info-circle-fill" />
+              <div>
+                <strong>{t('preview')}:</strong> <code>{previewCustomId(form.customIdFormat)}</code>
+              </div>
             </div>
-          </div>
-
-          <div className="mb-3 d-flex flex-wrap gap-1">
-            {['fixed', 'random20', 'random32', 'random6', 'random9', 'guid', 'datetime', 'sequence'].map(pt => (
-              <button key={pt} className="btn btn-sm btn-outline-secondary" onClick={() => addIdPart(pt)}
-                title={t(pt)}>
-                <i className="bi bi-plus me-1" />{t(pt)}
+            <div className="mb-3 d-flex align-items-center gap-2">
+              <select className="form-select form-select-sm" style={{ maxWidth: 220 }}
+                value={idPartType}
+                onChange={e => setIdPartType(e.target.value)}>
+                <option value="" disabled>{t('addPart')}...</option>
+                {['fixed', 'random20', 'random32', 'random6', 'random9', 'guid', 'datetime', 'sequence'].map(pt => (
+                  <option key={pt} value={pt}>{t(pt)}</option>
+                ))}
+              </select>
+              <button className="btn btn-primary btn-sm"
+                disabled={!idPartType || form.customIdFormat.length > 0}
+                onClick={() => addIdPart(idPartType)}>
+                <i className="bi bi-plus me-1" />{t('add')}
               </button>
-            ))}
+            </div>
+            <DndContext collisionDetection={closestCenter} onDragEnd={handleIdDragEnd}>
+              <SortableContext items={form.customIdFormat.map(p => p._id)} strategy={verticalListSortingStrategy}>
+                {form.customIdFormat.map((part, idx) => (
+                  <IdPart key={part._id} part={part}
+                    onChange={p => updateIdPart(idx, p)}
+                    onRemove={() => removeIdPart(idx)} />
+                ))}
+              </SortableContext>
+            </DndContext>
+            {!form.customIdFormat.length && <p className="text-muted">{t('noItems')}</p>}
           </div>
-
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleIdDragEnd}>
-            <SortableContext items={form.customIdFormat.map(p => p._id)} strategy={verticalListSortingStrategy}>
-              {form.customIdFormat.map((part, idx) => (
-                <IdPart key={part._id} part={part}
-                  onChange={p => updateIdPart(idx, p)}
-                  onRemove={() => removeIdPart(idx)} />
-              ))}
-            </SortableContext>
-          </DndContext>
-          {!form.customIdFormat.length && <p className="text-muted">{t('noItems')}</p>}
         </div>
       )}
 
       {/* --- FIELDS TAB --- */}
-      {activeTab === 'fields' && manageAccess && (
-        <div style={{ maxWidth: 700 }}>
-          <div className="mb-3 d-flex flex-wrap gap-1">
-            {['text_single', 'text_multi', 'number', 'link', 'boolean'].map(type => (
-              <button key={type} className="btn btn-sm btn-outline-primary" onClick={() => addField(type)}>
-                <i className="bi bi-plus me-1" />{t(type)}
-              </button>
-            ))}
-          </div>
-
-          <DndContext collisionDetection={closestCenter} onDragEnd={handleFieldDragEnd}>
-            <SortableContext items={form.fields.map(f => f.id || f._tempId)} strategy={verticalListSortingStrategy}>
-              {form.fields.map((field, idx) => (
-                <SortableField key={field.id || field._tempId} field={field}
-                  onUpdate={f => updateField(idx, f)}
-                  onRemove={() => removeField(idx)} />
-              ))}
-            </SortableContext>
-          </DndContext>
-          {!form.fields.length && <p className="text-muted">No fields yet. Add fields using the buttons above.</p>}
+{activeTab === 'fields' && manageAccess && (
+  <div className="d-flex justify-content-center">
+    <div style={{ maxWidth: 700, width: '100%' }}>
+      <div className="alert alert-info d-flex gap-2 mb-3">
+        <i className="bi bi-info-circle-fill" />
+        <div>
+          <strong>{t('fields')}:</strong> {form.fields.length} / {Object.values(FIELD_LIMITS).reduce((a, b) => a + b, 0)}
         </div>
-      )}
+      </div>
+
+      <div className="mb-3 d-flex align-items-center gap-2">
+        <select className="form-select form-select-sm" style={{ maxWidth: 220 }}
+          value={fieldType} onChange={e => setFieldType(e.target.value)}>
+          <option value="" disabled>{t('addField')}...</option>
+          {['text_single', 'text_multi', 'number', 'link', 'boolean'].map(type => (
+            <option key={type} value={type}>{t(type)}</option>
+          ))}
+        </select>
+        <button className="btn btn-primary btn-sm"
+          disabled={!fieldType}
+          onClick={() => { addField(fieldType); setFieldType(''); }}>
+          <i className="bi bi-plus me-1" />{t('add')}
+        </button>
+      </div>
+
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleFieldDragEnd}>
+        <SortableContext items={form.fields.map(f => f.id || f._tempId)} strategy={verticalListSortingStrategy}>
+          {form.fields.map((field, idx) => (
+            <SortableField key={field.id || field._tempId} field={field}
+              onUpdate={f => updateField(idx, f)}
+              onRemove={() => removeField(idx)} />
+          ))}
+        </SortableContext>
+      </DndContext>
+      {!form.fields.length && <p className="text-muted">{t('noItems')}</p>}
+    </div>
+  </div>
+)}
 
       {/* --- ACCESS TAB --- */}
       {activeTab === 'access' && manageAccess && (
-        <div style={{ maxWidth: 600 }}>
-          <div className="mb-3 position-relative">
-            <label className="form-label">{t('addUserAccess')}</label>
-            <input className="form-control" value={userSearch}
-              onChange={e => setUserSearch(e.target.value)} placeholder="Search by name or email..." />
-            {userResults.length > 0 && (
-              <ul className="dropdown-menu show w-100" style={{ zIndex: 1000 }}>
-                {userResults.map(u => (
-                  <li key={u.id}>
-                    <button className="dropdown-item" onClick={() => addAccess(u.id)}>
-                      {u.username} <small className="text-muted">({u.email})</small>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <div className="table-responsive">
-            <table className="table table-sm table-hover">
-              <thead className="table-light">
-                <tr><th>{t('username')}</th><th>{t('email')}</th><th></th></tr>
-              </thead>
-              <tbody>
-                {accessList.map(a => (
-                  <tr key={a.userId}>
-                    <td><Link to={`/profile/${a.userId}`}>{a.user?.username}</Link></td>
-                    <td><small>{a.user?.email}</small></td>
-                    <td>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => removeAccess(a.userId)}>
-                        <i className="bi bi-x" />
+        <div className="d-flex justify-content-center">
+          <div style={{ maxWidth: 600, width: '100%' }}>
+            <div className="mb-3 position-relative">
+              <label className="form-label">{t('addUserAccess')}</label>
+              <input className="form-control" value={userSearch}
+                onChange={e => setUserSearch(e.target.value)} placeholder="Search by name or email..." />
+              {userResults.length > 0 && (
+                <ul className="dropdown-menu show w-100" style={{ zIndex: 1000 }}>
+                  {userResults.map(u => (
+                    <li key={u.id}>
+                      <button className="dropdown-item" onClick={() => addAccess(u.id)}>
+                        {u.username} <small className="text-muted">({u.email})</small>
                       </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="table-responsive">
+              <table className="table table-sm table-hover">
+                <thead className="table-light">
+                  <tr><th>{t('username')}</th><th>{t('email')}</th><th></th></tr>
+                </thead>
+                <tbody>
+                  {accessList.map(a => (
+                    <tr key={a.userId}>
+                      <td><Link to={`/profile/${a.userId}`}>{a.user?.username}</Link></td>
+                      <td><small>{a.user?.email}</small></td>
+                      <td>
+                        <button className="btn btn-sm btn-outline-danger" onClick={() => removeAccess(a.userId)}>
+                          <i className="bi bi-x" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}
@@ -685,15 +816,15 @@ const deleteItems = async () => {
             <div key={label} className="card mb-2" style={{ maxWidth: 400 }}>
               <div className="card-body py-2">
                 <h6 className="card-title mb-1">{label}</h6>
-          {data.type === 'number' && (
-            <div className="d-flex gap-3 flex-wrap">
-            <span><small className="text-muted">{t('count')}</small><br /><strong>{data.count}</strong></span>
-            <span><small className="text-muted">Sum</small><br /><strong>{data.sum}</strong></span>
-            <span><small className="text-muted">{t('avg')}</small><br /><strong>{data.avg}</strong></span>
-            <span><small className="text-muted">{t('min')}</small><br /><strong>{data.min}</strong></span>
-            <span><small className="text-muted">{t('max')}</small><br /><strong>{data.max}</strong></span>
-          </div>  
-)}
+                {data.type === 'number' && (
+                  <div className="d-flex gap-3 flex-wrap">
+                    <span><small className="text-muted">{t('count')}</small><br /><strong>{data.count}</strong></span>
+                    <span><small className="text-muted">Sum</small><br /><strong>{data.sum}</strong></span>
+                    <span><small className="text-muted">{t('avg')}</small><br /><strong>{data.avg}</strong></span>
+                    <span><small className="text-muted">{t('min')}</small><br /><strong>{data.min}</strong></span>
+                    <span><small className="text-muted">{t('max')}</small><br /><strong>{data.max}</strong></span>
+                  </div>
+                )}
                 {data.type === 'text' && (
                   <div>
                     <small className="text-muted">{t('topValues')}:</small>
