@@ -17,8 +17,8 @@ export default function OAuthCallbackPage() {
       return;
     }
 
-    localStorage.setItem('token', token);
-    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    sessionStorage.setItem('token', token);
+    if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
 
     api.get('/auth/me')
       .then(({ data }) => {
