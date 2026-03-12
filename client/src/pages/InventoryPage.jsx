@@ -296,14 +296,17 @@ export default function InventoryPage() {
 
   const removeIdPart = (idx) => setForm(f => ({ ...f, customIdFormat: f.customIdFormat.filter((_, i) => i !== idx) }));
 
-  const handleIdDragEnd = ({ active, over }) => {
-    if (!over || active.id === over.id) return;
-    setForm(f => {
-      const ids = f.customIdFormat.map(p => p._id);
-      return { ...f, customIdFormat: arrayMove(f.customIdFormat, ids.indexOf(active.id), ids.indexOf(over.id)) };
-    });
-  };
-
+const handleIdDragEnd = ({ active, over }) => {
+  if (!over) {
+    removeIdPart(form.customIdFormat.findIndex(p => p._id === active.id));
+    return;
+  }
+  if (active.id === over.id) return;
+  setForm(f => {
+    const ids = f.customIdFormat.map(p => p._id);
+    return { ...f, customIdFormat: arrayMove(f.customIdFormat, ids.indexOf(active.id), ids.indexOf(over.id)) };
+  });
+};
   // Tags autocomplete
   useEffect(() => {
     if (tagInput.length < 1) { setTagSuggestions([]); return; }
@@ -351,10 +354,12 @@ export default function InventoryPage() {
     });
   };
 
-  const toggleSelectAll = () => {
-    if (selectedItems.size === items.length) setSelectedItems(new Set());
-    else setSelectedItems(new Set(items.map(i => i.id)));
-  };
+const ownItems = items.filter(i => user?.isAdmin || i.createdBy?.id === user?.id);
+
+const toggleSelectAll = () => {
+  if (selectedItems.size === ownItems.length && ownItems.length > 0) setSelectedItems(new Set());
+  else setSelectedItems(new Set(ownItems.map(i => i.id)));
+};
 
   // Comments
   const submitComment = async () => {
@@ -485,13 +490,14 @@ export default function InventoryPage() {
             <table className="table table-hover align-middle">
               <thead className="table-light">
                 <tr>
-                  {writeAccess && (
-                    <th>
-                      <input type="checkbox"
-                        checked={selectedItems.size === items.length && items.length > 0}
-                        onChange={toggleSelectAll} />
-                    </th>
-                  )}
+                {writeAccess && ownItems.length > 0 && (
+                <th>
+                <input type="checkbox"
+                checked={selectedItems.size === ownItems.length}
+                onChange={toggleSelectAll} />
+                </th>
+                )}
+                {writeAccess && ownItems.length === 0 && <th></th>}
                   <th style={{ cursor: 'pointer' }} onClick={() => toggleItemSort('name')}>
                     {t('title')}{sortIcon('name')}
                   </th>
@@ -522,13 +528,15 @@ export default function InventoryPage() {
                     <tr key={item.id}
                       onDoubleClick={() => navigate(`/inventories/${id}/items/${item.id}`)}
                       style={{ cursor: 'pointer' }}>
-                      {writeAccess && (
-                        <td onClick={e => e.stopPropagation()}>
-                          <input type="checkbox"
-                            checked={selectedItems.has(item.id)}
-                            onChange={() => toggleSelect(item.id)} />
-                        </td>
-                      )}
+                    {writeAccess && (
+                    <td onClick={e => e.stopPropagation()}>
+                     {(user?.isAdmin || item.createdBy?.id === user?.id) && (
+                     <input type="checkbox"
+                    checked={selectedItems.has(item.id)}
+                   onChange={() => toggleSelect(item.id)} />
+                    )}
+                    </td>
+                    )}
                       <td>
                         <Link to={`/inventories/${id}/items/${item.id}`} onClick={e => e.stopPropagation()}>
                           {item.name || '—'}
@@ -649,7 +657,7 @@ export default function InventoryPage() {
                 ))}
               </div>
               <div className="position-relative" style={{ maxWidth: 300 }}>
-                <input className="form-control form-control-sm" placeholder="Add tag..."
+                <input className="form-control form-control-sm" placeholder={t('Add tag')}
                   value={tagInput}
                   onChange={e => {
                     const val = e.target.value;
@@ -771,7 +779,7 @@ export default function InventoryPage() {
             <div className="mb-3 position-relative">
               <label className="form-label">{t('addUserAccess')}</label>
               <input className="form-control" value={userSearch}
-                onChange={e => setUserSearch(e.target.value)} placeholder="Search by name or email..." />
+                onChange={e => setUserSearch(e.target.value)} placeholder={t('Search by name or email...')} />
               {userResults.length > 0 && (
                 <ul className="dropdown-menu show w-100" style={{ zIndex: 1000 }}>
                   {userResults.map(u => (
@@ -811,7 +819,7 @@ export default function InventoryPage() {
       {/* --- STATS TAB --- */}
       {activeTab === 'stats' && stats && (
         <div>
-          <p><strong>{t('total')} {t('items')}:</strong> {stats.totalItems}</p>
+        <p><strong>{t('totalItems')}:</strong> {stats.totalItems}</p>
           {Object.entries(stats.fields).map(([label, data]) => (
             <div key={label} className="card mb-2" style={{ maxWidth: 400 }}>
               <div className="card-body py-2">

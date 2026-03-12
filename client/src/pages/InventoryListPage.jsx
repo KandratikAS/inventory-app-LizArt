@@ -93,11 +93,6 @@ export default function InventoryListPage() {
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           />
-          {user && (
-            <Link className="btn btn-primary btn-sm" to="/inventories/new">
-              <i className="bi bi-plus me-1" />{t('createInventory')}
-            </Link>
-          )}
         </div>
       </div>
 

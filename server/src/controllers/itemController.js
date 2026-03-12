@@ -11,8 +11,9 @@ async function getWriteAccess(inventoryId, user) {
     include: { access: true },
   });
   if (!inv) return false;
-  if (user.isAdmin || inv.ownerId === user.id) return true;
-  if (inv.isPublic) return true; 
+  if (user.isAdmin) return true;
+  if (inv.isPublic) return true;
+  if (inv.ownerId === user.id) return true;
   return inv.access.some((a) => a.userId === user.id);
 }
 
@@ -82,23 +83,28 @@ exports.create = async (req, res, next) => {
 
     const { fieldValues, customId: providedId } = req.body;
 
-    // Compute next sequence value
-    const lastItem = await prisma.item.findFirst({
-      where: { inventoryId },
-      orderBy: { createdAt: 'desc' },
-      select: { customId: true },
-    });
-
     const count = await prisma.item.count({ where: { inventoryId } });
-    const seqVal = count + 1;
 
-    const customId = providedId || generateCustomId(inv.customIdFormat, seqVal);
-
-    const conflict = await prisma.item.findUnique({
-      where: { inventoryId_customId: { inventoryId, customId } },
-    });
-    if (conflict)
-      return res.status(409).json({ error: 'Custom ID already exists', field: 'customId' });
+    let customId = providedId;
+    if (!customId) {
+      let seqVal = count + 1;
+      let attempts = 0;
+      while (attempts < 100) {
+        customId = generateCustomId(inv.customIdFormat, seqVal);
+        const conflict = await prisma.item.findUnique({
+          where: { inventoryId_customId: { inventoryId, customId } },
+        });
+        if (!conflict) break;
+        seqVal++;
+        attempts++;
+      }
+    } else {
+      const conflict = await prisma.item.findUnique({
+        where: { inventoryId_customId: { inventoryId, customId } },
+      });
+      if (conflict)
+        return res.status(409).json({ error: 'Custom ID already exists', field: 'customId' });
+    }
 
     const titleField = await prisma.inventoryField.findFirst({
       where: { inventoryId, label: 'Title' }
@@ -136,6 +142,10 @@ exports.update = async (req, res, next) => {
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     if (!(await getWriteAccess(existing.inventoryId, req.user)))
+      return res.status(403).json({ error: 'Forbidden' });
+
+    const isInventoryOwner = existing.inventory.ownerId === req.user.id;
+    if (!req.user.isAdmin && !isInventoryOwner && existing.createdById !== req.user.id)
       return res.status(403).json({ error: 'Forbidden' });
 
     const { fieldValues, customId, version } = req.body;
@@ -179,10 +189,17 @@ exports.update = async (req, res, next) => {
 
 exports.remove = async (req, res, next) => {
   try {
-    const existing = await prisma.item.findUnique({ where: { id: req.params.id } });
+    const existing = await prisma.item.findUnique({
+      where: { id: req.params.id },
+      include: { inventory: true },
+    });
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     if (!(await getWriteAccess(existing.inventoryId, req.user)))
+      return res.status(403).json({ error: 'Forbidden' });
+
+    const isInventoryOwner = existing.inventory.ownerId === req.user.id;
+    if (!req.user.isAdmin && !isInventoryOwner && existing.createdById !== req.user.id)
       return res.status(403).json({ error: 'Forbidden' });
 
     await prisma.item.delete({ where: { id: req.params.id } });
@@ -216,6 +233,7 @@ exports.unlike = async (req, res, next) => {
     next(e);
   }
 };
+
 exports.myCreated = async (req, res, next) => {
   try {
     const items = await prisma.item.findMany({
@@ -249,6 +267,7 @@ exports.myAccessible = async (req, res, next) => {
     res.json({ items });
   } catch (e) { next(e); }
 };
+
 exports.bulkRemove = async (req, res, next) => {
   try {
     const { ids } = req.body;
@@ -257,14 +276,19 @@ exports.bulkRemove = async (req, res, next) => {
 
     const items = await prisma.item.findMany({
       where: { id: { in: ids } },
-      select: { inventoryId: true },
+      select: { inventoryId: true, createdById: true, inventory: { select: { ownerId: true } } },
     });
 
-    const inventoryIds = [...new Set(items.map(i => i.inventoryId))];
-    for (const inventoryId of inventoryIds) {
-      if (!(await getWriteAccess(inventoryId, req.user)))
+    for (const item of items) {
+      if (!(await getWriteAccess(item.inventoryId, req.user)))
+        return res.status(403).json({ error: 'Forbidden' });
+
+      const isInventoryOwner = item.inventory.ownerId === req.user.id;
+      if (!req.user.isAdmin && !isInventoryOwner && item.createdById !== req.user.id)
         return res.status(403).json({ error: 'Forbidden' });
     }
+
+    const inventoryIds = [...new Set(items.map(i => i.inventoryId))];
 
     await prisma.item.deleteMany({ where: { id: { in: ids } } });
 

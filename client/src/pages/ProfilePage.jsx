@@ -302,11 +302,6 @@ export default function ProfilePage() {
 
           {activeProfileTab === 'items' && (
             <>
-              <div className="d-flex align-items-center justify-content-end mb-2">
-                <Link className="btn btn-primary btn-sm" to="/inventories">
-                  <i className="bi bi-plus me-1" />{t('addItem')}
-                </Link>
-              </div>
               <SortableItemTable items={myItems} title="" navigate={navigate} t={t} />
             </>
           )}
