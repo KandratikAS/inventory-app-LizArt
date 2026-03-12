@@ -26,7 +26,6 @@ export default function OAuthCallbackPage() {
         navigate('/');
       })
       .catch(() => navigate('/login?error=oauth'));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

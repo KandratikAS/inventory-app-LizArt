@@ -9,19 +9,18 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const loadUser = useCallback(async () => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token');
     if (!token) { setLoading(false); return; }
     try {
       const { data } = await api.get('/auth/me');
       setUser(data.user);
-      // Restore user language preference
       if (data.user.language) {
         i18n.changeLanguage(data.user.language);
-        localStorage.setItem('language', data.user.language);
+        sessionStorage.setItem('language', data.user.language);
       }
     } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refreshToken');
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('refreshToken');
     } finally {
       setLoading(false);
     }
@@ -30,18 +29,18 @@ export function AuthProvider({ children }) {
   useEffect(() => { loadUser(); }, [loadUser]);
 
   const login = (userData, token, refreshToken) => {
-    localStorage.setItem('token', token);
-    if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+    sessionStorage.setItem('token', token);
+    if (refreshToken) sessionStorage.setItem('refreshToken', refreshToken);
     setUser(userData);
     if (userData.language) {
       i18n.changeLanguage(userData.language);
-      localStorage.setItem('language', userData.language);
+      sessionStorage.setItem('language', userData.language);
     }
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('refreshToken');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('refreshToken');
     setUser(null);
   };
 
