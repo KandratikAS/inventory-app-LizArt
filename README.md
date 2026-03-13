@@ -5,13 +5,21 @@ Live demo: inventory-client-2a2m.onrender.com
 Features
 
 📦 Inventory management — create and organize inventories with custom categories
+
 🔍 Search & filter — find items across all inventories instantly
+
 🧩 Custom item fields — flexible schema per inventory with custom ID formats
+
 💬 Real-time comments — live updates via WebSocket (Socket.IO)
+
 🔐 Authentication — email/password + Google & GitHub OAuth
+
 🌍 i18n — English and Belarusian interface
+
 🛡️ Admin panel — manage users, categories, and inventories
+
 👤 User profiles — avatar, owned items, access control
+
 📱 Responsive — works on desktop and mobile
 
 **Frontend:**
