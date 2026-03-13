@@ -1,5 +1,7 @@
 🦎 LizArt — Inventory Management System
+
 A web application for managing personal and team inventories with real-time collaboration, OAuth authentication, and multilingual support.
+
 Live demo: inventory-client-2a2m.onrender.com
 
 Features
