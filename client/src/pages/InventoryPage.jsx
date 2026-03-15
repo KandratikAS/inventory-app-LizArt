@@ -224,11 +224,10 @@ export default function InventoryPage() {
     if (!manageAccess || isNew || activeTab === 'settings') return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     setSaveStatus('');
-    saveTimer.current = setTimeout(autoSave, 10000);
+    saveTimer.current = setTimeout(autoSave, 5000);
     return () => clearTimeout(saveTimer.current);
   }, [form, autoSave, activeTab]);
 
-  // Ручное захаванне для Settings
   const saveSettings = async () => {
     setSaveStatus('autoSaving');
     try {
