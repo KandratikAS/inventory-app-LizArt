@@ -638,13 +638,6 @@ const toggleSelectAll = () => {
               )}
             </div>
             <div className="col-12">
-              <div className="form-check">
-                <input className="form-check-input" type="checkbox" id="isPublic" checked={form.isPublic}
-                  onChange={e => setForm(f => ({ ...f, isPublic: e.target.checked }))} />
-                <label className="form-check-label" htmlFor="isPublic">{t('isPublic')}</label>
-              </div>
-            </div>
-            <div className="col-12">
               <label className="form-label">{t('tags')}</label>
               <div className="d-flex flex-wrap gap-1 mb-2">
                 {form.tags.map(tag => (
