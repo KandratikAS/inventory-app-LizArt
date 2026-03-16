@@ -69,12 +69,21 @@ function previewCustomId(format) {
     .map((part) => {
       switch (part.type) {
         case 'fixed': return part.value || '';
-        case 'random20': return part.padded ? '0'.padStart(part.padLength || 7, '0') + '42' : '42';
-        case 'random32': return part.padded ? '0'.padStart(part.padLength || 10, '0') + '1234' : '1234';
-        case 'random6': return '042857';
-        case 'random9': return '042857321';
-        case 'guid': return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
-        case 'datetime': return '20240315143022';
+        case 'random20': {
+          const val = Math.floor(Math.random() * 1048575);
+          return part.padded ? String(val).padStart(part.padLength || 7, '0') : String(val);
+        }
+        case 'random32': {
+          const val = Math.floor(Math.random() * 4294967295);
+          return part.padded ? String(val).padStart(part.padLength || 10, '0') : String(val);
+        }
+        case 'random6': return String(Math.floor(Math.random() * 900000) + 100000);
+        case 'random9': return String(Math.floor(Math.random() * 900000000) + 100000000);
+        case 'guid': return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+          const r = Math.random() * 16 | 0;
+          return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+        });
+        case 'datetime': return new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
         case 'sequence': return part.padded ? '1'.padStart(part.padLength || 6, '0') : '1';
         default: return '';
       }

@@ -96,12 +96,21 @@ function previewCustomId(format) {
   return format.map(p => {
     switch (p.type) {
       case 'fixed': return p.value || '';
-      case 'random20': return p.padded ? '0000042' : '42';
-      case 'random32': return p.padded ? '0000001234' : '1234';
-      case 'random6': return '042857';
-      case 'random9': return '042857321';
-      case 'guid': return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx';
-      case 'datetime': return '20240315143022';
+      case 'random20': {
+        const val = Math.floor(Math.random() * 1048575);
+        return p.padded ? String(val).padStart(p.padLength || 7, '0') : String(val);
+      }
+      case 'random32': {
+        const val = Math.floor(Math.random() * 4294967295);
+        return p.padded ? String(val).padStart(p.padLength || 10, '0') : String(val);
+      }
+      case 'random6': return String(Math.floor(Math.random() * 900000) + 100000);
+      case 'random9': return String(Math.floor(Math.random() * 900000000) + 100000000);
+      case 'guid': return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+        const r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+      });
+      case 'datetime': return new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
       case 'sequence': return p.padded ? '1'.padStart(p.padLength || 6, '0') : '1';
       default: return '';
     }
