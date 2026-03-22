@@ -38,7 +38,6 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use('/api/salesforce', require('./src/routes/salesforce'));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
@@ -50,6 +49,7 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+app.use('/api/salesforce', require('./src/routes/salesforce'));
 app.use('/api/auth', authRoutes);
 app.use('/api/inventories', inventoryRoutes);
 app.use('/api/items', itemRoutes);
