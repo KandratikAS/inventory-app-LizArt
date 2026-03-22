@@ -14,15 +14,19 @@ async function getConnection() {
     password: process.env.SF_PASSWORD,
   });
 
-  const { data } = await axios.post(
-    `${process.env.SF_LOGIN_URL}/services/oauth2/token`,
-    params.toString(),
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-  );
-
-  accessToken = data.access_token;
-  instanceUrl = data.instance_url;
-  return { accessToken, instanceUrl };
+  try {
+    const { data } = await axios.post(
+      `${process.env.SF_LOGIN_URL}/services/oauth2/token`,
+      params.toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    accessToken = data.access_token;
+    instanceUrl = data.instance_url;
+    return { accessToken, instanceUrl };
+  } catch (e) {
+    console.error('SF Auth error:', JSON.stringify(e.response?.data));
+    throw new Error(JSON.stringify(e.response?.data));
+  }
 }
 
 async function createAccountWithContact({ firstName, lastName, email, phone, company }) {
@@ -33,29 +37,34 @@ async function createAccountWithContact({ firstName, lastName, email, phone, com
     'Content-Type': 'application/json',
   };
 
-  const accountRes = await axios.post(
-    `${instanceUrl}/services/data/v59.0/sobjects/Account`,
-    {
-      Name: company || `${firstName} ${lastName}`,
-      Phone: phone || '',
-      Website: 'https://inventory-client-2a2m.onrender.com',
-    },
-    { headers }
-  );
+  try {
+    const accountRes = await axios.post(
+      `${instanceUrl}/services/data/v59.0/sobjects/Account`,
+      {
+        Name: company || `${firstName} ${lastName}`,
+        Phone: phone || '',
+        Website: 'https://inventory-client-2a2m.onrender.com',
+      },
+      { headers }
+    );
 
-  const contactRes = await axios.post(
-    `${instanceUrl}/services/data/v59.0/sobjects/Contact`,
-    {
-      FirstName: firstName,
-      LastName: lastName,
-      Email: email,
-      Phone: phone || '',
-      AccountId: accountRes.data.id,
-    },
-    { headers }
-  );
+    const contactRes = await axios.post(
+      `${instanceUrl}/services/data/v59.0/sobjects/Contact`,
+      {
+        FirstName: firstName,
+        LastName: lastName,
+        Email: email,
+        Phone: phone || '',
+        AccountId: accountRes.data.id,
+      },
+      { headers }
+    );
 
-  return { accountId: accountRes.data.id, contactId: contactRes.data.id };
+    return { accountId: accountRes.data.id, contactId: contactRes.data.id };
+  } catch (e) {
+    console.error('SF API error:', JSON.stringify(e.response?.data));
+    throw new Error(JSON.stringify(e.response?.data));
+  }
 }
 
 module.exports = { createAccountWithContact };
