@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/auth');
+const { authenticate, requireAuth } = require('../middleware/auth');
 const { createAccountWithContact } = require('../services/salesforce');
 
-router.post('/sync', requireAuth, async (req, res) => {
+router.post('/sync', authenticate, requireAuth, async (req, res) => {
   try {
     const { firstName, lastName, phone, company } = req.body;
     if (!firstName || !lastName) return res.status(400).json({ error: 'First and last name required' });
