@@ -193,6 +193,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [activeProfileTab, setActiveProfileTab] = useState('items');
 
+  const [sfForm, setSfForm] = useState({ firstName: '', lastName: '', phone: '', company: '' });
+  const [sfLoading, setSfLoading] = useState(false);
+  const [sfMsg, setSfMsg] = useState('');
+  const [sfSuccess, setSfSuccess] = useState(false);
+  const [showSfForm, setShowSfForm] = useState(false);
+
   useEffect(() => {
     if (!profileId) return;
     const reqs = [api.get(`/users/${profileId}/profile`).then((r) => setProfile(r.data.user))];
@@ -219,6 +225,22 @@ export default function ProfilePage() {
       setSaveMsg(e.response?.data?.error || t('error'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const syncToSalesforce = async () => {
+    setSfLoading(true);
+    setSfMsg('');
+    setSfSuccess(false);
+    try {
+      await api.post('/salesforce/sync', { ...sfForm });
+      setSfSuccess(true);
+      setSfMsg(t('sfSuccess'));
+      setShowSfForm(false);
+    } catch (e) {
+      setSfMsg(e.response?.data?.error || t('error'));
+    } finally {
+      setSfLoading(false);
     }
   };
 
@@ -283,6 +305,69 @@ export default function ProfilePage() {
         </div>
       )}
 
+      {isOwn && currentUser && (
+        <div className="card mb-4">
+          <div className="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>
+              <img src="https://upload.wikimedia.org/wikipedia/commons/f/f9/Salesforce.com_logo.svg"
+                alt="Salesforce" height={18} className="me-2" />
+              Salesforce CRM
+              {sfSuccess && <span className="badge bg-success ms-2 small"><i className="bi bi-check2 me-1" />{t('synced')}</span>}
+            </span>
+            <button className="btn btn-sm btn-outline-primary" onClick={() => { setShowSfForm(v => !v); setSfMsg(''); }}>
+              {showSfForm ? t('cancel') : t('syncWithSalesforce')}
+            </button>
+          </div>
+          {showSfForm && (
+            <div className="card-body">
+              <p className="text-muted small mb-3">{t('sfDescription')}</p>
+              <div className="row g-2" style={{ maxWidth: 500 }}>
+                <div className="col-6">
+                  <label className="form-label small fw-semibold">{t('firstName')} *</label>
+                  <input className="form-control" value={sfForm.firstName}
+                    onChange={e => setSfForm(p => ({ ...p, firstName: e.target.value }))} />
+                </div>
+                <div className="col-6">
+                  <label className="form-label small fw-semibold">{t('lastName')} *</label>
+                  <input className="form-control" value={sfForm.lastName}
+                    onChange={e => setSfForm(p => ({ ...p, lastName: e.target.value }))} />
+                </div>
+                <div className="col-6">
+                  <label className="form-label small fw-semibold">{t('phone')}</label>
+                  <input className="form-control" value={sfForm.phone}
+                    placeholder="+1 234 567 8900"
+                    onChange={e => setSfForm(p => ({ ...p, phone: e.target.value }))} />
+                </div>
+                <div className="col-6">
+                  <label className="form-label small fw-semibold">{t('company')}</label>
+                  <input className="form-control" value={sfForm.company}
+                    onChange={e => setSfForm(p => ({ ...p, company: e.target.value }))} />
+                </div>
+                <div className="col-12 mt-1">
+                  <small className="text-muted">
+                    <i className="bi bi-envelope me-1" />{t('email')}: <strong>{currentUser.email}</strong>
+                  </small>
+                </div>
+                <div className="col-12">
+                  <button className="btn btn-primary btn-sm"
+                    disabled={sfLoading || !sfForm.firstName.trim() || !sfForm.lastName.trim()}
+                    onClick={syncToSalesforce}>
+                    {sfLoading
+                      ? <><span className="spinner-border spinner-border-sm me-1" />{t('syncing')}</>
+                      : <><i className="bi bi-cloud-upload me-1" />{t('syncWithSalesforce')}</>}
+                  </button>
+                </div>
+                {sfMsg && (
+                  <div className={`col-12 small ${sfSuccess ? 'text-success' : 'text-danger'}`}>
+                    {sfSuccess ? <><i className="bi bi-check2-circle me-1" />{sfMsg}</> : sfMsg}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {isOwn && (
         <>
           <ul className="nav nav-tabs mb-4">
@@ -301,9 +386,7 @@ export default function ProfilePage() {
           </ul>
 
           {activeProfileTab === 'items' && (
-            <>
-              <SortableItemTable items={myItems} title="" navigate={navigate} t={t} />
-            </>
+            <SortableItemTable items={myItems} title="" navigate={navigate} t={t} />
           )}
 
           {activeProfileTab === 'shared' && (

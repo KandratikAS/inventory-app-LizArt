@@ -38,6 +38,7 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/api/salesforce', require('./routes/salesforce'));
 
 app.use(session({
   secret: process.env.SESSION_SECRET || 'secret',
