@@ -50,6 +50,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use('/api/salesforce', require('./src/routes/salesforce'));
+app.use('/api/public', require('./src/routes/publicApi'));
 app.use('/api/auth', authRoutes);
 app.use('/api/inventories', inventoryRoutes);
 app.use('/api/items', itemRoutes);

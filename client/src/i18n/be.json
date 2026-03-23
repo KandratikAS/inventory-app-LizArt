@@ -165,6 +165,8 @@
   "firstName": "Імя",
   "lastName": "Прозвішча",
   "phone": "Тэлефон",
-  "company": "Кампанія"
+  "company": "Кампанія",
+  "generateApiToken": "Згенераваць API токен",
+  "apiTokenUrl": "Публічны API URL"
 
 }

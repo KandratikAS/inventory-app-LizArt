@@ -81,6 +81,8 @@ model Inventory {
   access          InventoryAccess[]
   tags            InventoryTag[]
   comments        Comment[]
+  apiToken  String?  @unique
+
 
   @@index([ownerId])
   lastViewedAt DateTime?

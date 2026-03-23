@@ -165,7 +165,9 @@
   "firstName": "First name",
   "lastName": "Last name", 
   "phone": "Phone",
-  "company": "Company"
+  "company": "Company",
+  "generateApiToken": "Generate API Token",
+  "apiTokenUrl": "Public API URL"
 
 
 }
