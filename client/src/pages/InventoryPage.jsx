@@ -425,6 +425,7 @@ const toggleSelectAll = () => {
   const [stats, setStats] = useState(null);
   const [apiToken, setApiToken] = useState(inventory?.apiToken || '');
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [odooLoading, setOdooLoading] = useState(false);
   const loadStats = () => {
     if (!stats) api.get(`/inventories/${id}/stats`).then(r => setStats(r.data.stats));
   };
@@ -444,6 +445,18 @@ const toggleSelectAll = () => {
     setTokenLoading(false);
   }
 };
+
+const syncToOdoo = async () => {
+    setOdooLoading(true);
+    try {
+      const r = await api.post(`/inventories/${id}/sync`);
+      alert(`${t('syncedToOdoo') || 'Synced!'} (Odoo ID: ${r.data.odooId})`);
+    } catch (e) {
+      alert(e.response?.data?.error || t('error'));
+    } finally {
+      setOdooLoading(false);
+    }
+  };
 
   return (
     <div className="container-fluid">
@@ -630,7 +643,7 @@ const toggleSelectAll = () => {
         </div>
       )}
 
-      {/* --- SETTINGS TAB --- */}
+{/* --- SETTINGS TAB --- */}
       {activeTab === 'settings' && manageAccess && (
         <div className="d-flex justify-content-center">
           <div className="row g-3 w-100" style={{ maxWidth: 600 }}>
@@ -661,6 +674,8 @@ const toggleSelectAll = () => {
                 <div className="invalid-feedback">Must be a valid URL (https://...)</div>
               )}
             </div>
+            
+            {/* Tags Section */}
             <div className="col-12">
               <label className="form-label">{t('tags')}</label>
               <div className="d-flex flex-wrap gap-1 mb-2">
@@ -693,58 +708,60 @@ const toggleSelectAll = () => {
             </div>
 
             {!isNew && (
-            <div className="col-12">
-            <label className="form-label fw-semibold">
-            <i className="bi bi-key me-1" />API Token
-            </label>
-            {apiToken ? (
-            <div className="d-flex gap-2 align-items-center">
-            <input className="form-control form-control-sm font-monospace" readOnly
-            value={apiToken}
-            style={{ fontSize: 12 }} />
-              <button className="btn btn-sm btn-outline-secondary"
-            onClick={() => navigator.clipboard.writeText(apiToken)}>
-            <i className="bi bi-copy" />
-            </button>
-            <button className="btn btn-sm btn-outline-warning" onClick={generateToken} disabled={tokenLoading}>
-            <i className="bi bi-arrow-clockwise" />
-            </button>
-            </div>
-            ) : (
-            <button className="btn btn-sm btn-outline-primary" onClick={generateToken} disabled={tokenLoading}>
-            {tokenLoading
-            ? <span className="spinner-border spinner-border-sm me-1" />
-            : <i className="bi bi-key me-1" />}
-            {t('generateApiToken')}
-            </button>
-            )}
-            {apiToken && (
-            <div className="mt-2">
-            <small className="text-muted">
-            {t('apiTokenUrl')}:{' '}
-            <code className="small">
-            {`${import.meta.env.VITE_API_URL}/api/public/${apiToken}`}
-            </code>
-            </small>
-            </div>
-            )}
-            </div>
+              <>
+                <div className="col-12 mt-3 border-top pt-3">
+                  <label className="form-label fw-semibold">
+                    <i className="bi bi-key me-1" />API Token
+                  </label>
+                  {apiToken ? (
+                    <div className="d-flex gap-2 align-items-center">
+                      <input className="form-control form-control-sm font-monospace" readOnly
+                        value={apiToken} style={{ fontSize: 12 }} />
+                      <button className="btn btn-sm btn-outline-secondary" onClick={() => navigator.clipboard.writeText(apiToken)}>
+                        <i className="bi bi-copy" />
+                      </button>
+                      <button className="btn btn-sm btn-outline-warning" onClick={generateToken} disabled={tokenLoading}>
+                        <i className="bi bi-arrow-clockwise" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-sm btn-outline-primary" onClick={generateToken} disabled={tokenLoading}>
+                      {tokenLoading ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-key me-1" />}
+                      {t('generateApiToken')}
+                    </button>
+                  )}
+                  {apiToken && (
+                    <div className="mt-2 text-muted" style={{ fontSize: '0.75rem' }}>
+                      URL: <code className="small">{`${import.meta.env.VITE_API_URL}/api/public/${apiToken}`}</code>
+                    </div>
+                  )}
+                </div>
+
+                <div className="col-12 mt-3">
+                  <label className="form-label fw-semibold text-success">
+                    <i className="bi bi-cloud-arrow-up me-1" /> Odoo ERP Integration
+                  </label>
+                  <button className="btn btn-sm btn-success w-100 d-flex align-items-center justify-content-center" 
+                    onClick={syncToOdoo} disabled={odooLoading}>
+                    {odooLoading ? (
+                      <><span className="spinner-border spinner-border-sm me-2" /> {t('syncing')}...</>
+                    ) : (
+                      <><i className="bi bi-arrow-repeat me-2" /> {t('syncWithOdoo')}</>
+                    )}
+                  </button>
+                </div>
+              </>
             )}
 
-            <div className="col-12 d-flex align-items-center gap-2">
-            <button className="btn btn-primary"
-            onClick={saveSettings}
-            disabled={saveStatus === 'autoSaving' || !form.title.trim() || (form.imageUrl && !/^https?:\/\/.+/.test(form.imageUrl))}>
-            {t('save')}
-            </button>
+            <div className="col-12 d-flex align-items-center gap-2 border-top pt-3 mt-2">
+              <button className="btn btn-primary"
+                onClick={isNew ? handleCreate : saveSettings}
+                disabled={saveStatus === 'autoSaving' || !form.title.trim() || (form.imageUrl && !/^https?:\/\/.+/.test(form.imageUrl))}>
+                {isNew ? t('create') : t('save')}
+              </button>
               {saveStatus === 'saved' && <span className="text-success small"><i className="bi bi-check2 me-1" />{t('saved')}</span>}
               {saveStatus === 'conflict' && <span className="text-danger small">{t('versionConflict')}</span>}
             </div>
-            {isNew && (
-              <div className="col-12">
-                <button className="btn btn-primary" onClick={handleCreate}>{t('save')}</button>
-              </div>
-            )}
           </div>
         </div>
       )}

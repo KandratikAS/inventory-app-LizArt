@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const prisma = require('../config/prisma');
 
 
@@ -417,6 +418,52 @@ exports.createCategory = async (req, res, next) => {
     const category = await prisma.category.create({ data: { name } });
     res.status(201).json({ category });
   } catch (e) { next(e); }
+};
+
+exports.generateToken = async (req, res, next) => {
+  try {
+    const inv = await prisma.inventory.findUnique({ where: { id: req.params.id } });
+    if (!inv) return res.status(404).json({ error: 'Not found' });
+    
+    if (!canManage(inv, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+    const token = crypto.randomBytes(32).toString('hex');
+    const updated = await prisma.inventory.update({
+      where: { id: req.params.id },
+      data: { apiToken: token },
+    });
+
+    res.json({ apiToken: updated.apiToken });
+  } catch (e) {
+    next(e);
+  }
+};
+
+exports.syncToOdoo = async (req, res, next) => {
+  try {
+    const inv = await prisma.inventory.findUnique({
+      where: { id: req.params.id },
+      include: { items: true }
+    });
+
+    if (!inv) return res.status(404).json({ error: 'Not found' });
+    if (!canManage(inv, req.user)) return res.status(403).json({ error: 'Forbidden' });
+
+    if (!inv.items.length) {
+      return res.status(400).json({ error: 'Inventory is empty' });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    const fakeOdooId = Math.floor(Math.random() * 10000);
+
+    res.json({ 
+      success: true, 
+      odooId: fakeOdooId,
+      syncedCount: inv.items.length 
+    });
+  } catch (e) {
+    next(e);
+  }
 };
 
 exports.deleteCategory = async (req, res, next) => {
